@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>גלריית קבצים מתקדמת</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(145deg, #0f2027, #203a43, #2c5364);
+      color: white;
+    }
+    header {
+      padding: 1rem;
+      background: #1f1f1f;
+      text-align: center;
+      font-size: 1.5rem;
+    }
+    .top-controls {
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+      margin: 1rem;
+    }
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      padding: 0.5rem;
+    }
+    .tab {
+      background: #2c3e50;
+      padding: 0.5rem 1rem;
+      border-radius: 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .tab:hover { background: #34495e; }
+    .delete-tab {
+      background: red;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+    .content {
+      padding: 1rem;
+      display: none;
+    }
+    .content.active {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .upload-box {
+      background: #34495e;
+      padding: 1rem;
+      border-radius: 15px;
+      text-align: center;
+      position: relative;
+    }
+    .upload-box input {
+      display: none;
+    }
+    .file-name {
+      font-size: 0.9rem;
+      word-break: break-word;
+      margin-bottom: 0.5rem;
+    }
+    .delete-btn {
+      position: absolute;
+      top: 5px;
+      left: 5px;
+      background: red;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      cursor: pointer;
+    }
+    .btn {
+      padding: 0.5rem 1rem;
+      border-radius: 20px;
+      color: white;
+      background: #16a085;
+      cursor: pointer;
+    }
+    .note {
+      color: #ffd700;
+      font-size: 0.9rem;
+      margin-bottom: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <header>📁 גלריית קבצים מתקדמת</header>
+  <div class="top-controls">
+    <div class="btn" onclick="addTab()">➕ לשונית חדשה</div>
+    <div class="btn" onclick="addByCode()">🔐 הזן קוד</div>
+  </div>
+  <div class="tabs" id="tabs"></div>
+  <div id="contents"></div>
+<script>
+let tabs = JSON.parse(localStorage.getItem('tabs') || '["ראשי"]');
+let data = JSON.parse(localStorage.getItem('files') || '{}');
+let tabSource = JSON.parse(localStorage.getItem('tabSource') || '{}');
+let activeTab = 0;
+const tabsEl = document.getElementById('tabs');
+const contentsEl = document.getElementById('contents');
+
+function save() {
+  localStorage.setItem("tabs", JSON.stringify(tabs));
+  localStorage.setItem("files", JSON.stringify(data));
+  localStorage.setItem("tabSource", JSON.stringify(tabSource));
+  renderTabs();
+}
+
+function renderTabs() {
+  tabsEl.innerHTML = '';
+  tabs.forEach((tab, i) => {
+    const el = document.createElement('div');
+    el.className = 'tab';
+    el.onclick = () => setActiveTab(i);
+
+    const span = document.createElement('span');
+    span.innerText = tab;
+    span.ondblclick = () => renameTab(i);
+
+    const del = document.createElement('button');
+    del.innerText = '🗑️';
+    del.className = 'delete-tab';
+    del.onclick = (e) => {
+      e.stopPropagation();
+      tabs.splice(i, 1);
+      delete data[tab];
+      delete tabSource[tab];
+      if (activeTab >= tabs.length) activeTab = tabs.length - 1;
+      save();
+    };
+
+    el.appendChild(span);
+    el.appendChild(del);
+    tabsEl.appendChild(el);
+  });
+  renderContent();
+}
+
+function addTab() {
+  const name = prompt('שם הלשונית:');
+  if (!name) return;
+  tabs.unshift(name);
+  data[name] = [];
+  tabSource[name] = 'manual';
+  save();
+  setActiveTab(0);
+}
+
+function renameTab(i) {
+  const name = prompt('שם חדש:', tabs[i]);
+  if (!name) return;
+  const old = tabs[i];
+  tabs[i] = name;
+  data[name] = data[old];
+  tabSource[name] = tabSource[old];
+  delete data[old];
+  delete tabSource[old];
+  save();
+}
+
+function setActiveTab(i) {
+  activeTab = i;
+  renderContent();
+}
+
+function renderContent() {
+  contentsEl.innerHTML = '';
+  tabs.forEach((tab, i) => {
+    const box = document.createElement('div');
+    box.className = 'content';
+    if (i === activeTab) box.classList.add('active');
+    const files = data[tab] || [];
+
+    files.forEach((file, index) => {
+      const div = document.createElement('div');
+      div.className = 'upload-box';
+
+      const del = document.createElement('button');
+      del.innerText = '❌';
+      del.className = 'delete-btn';
+      del.onclick = () => {
+        files.splice(index, 1);
+        save();
+      };
+      div.appendChild(del);
+
+      const name = document.createElement('div');
+      name.className = 'file-name';
+      name.innerText = file.name;
+      div.appendChild(name);
+
+      if (!file.uploaded && file.driveId && !file.downloadedOnce) {
+        const a = document.createElement('a');
+        a.setAttribute('href', `https://drive.google.com/uc?export=download&id=${file.driveId}`);
+        a.setAttribute('download', file.name + ".html");
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        setTimeout(() => {
+          a.click();
+          document.body.removeChild(a);
+        }, 100);
+        file.downloadedOnce = true;
+        save();
+      }
+
+      if (!file.uploaded) {
+        const note = document.createElement('div');
+        note.className = 'note';
+        note.innerText = "📥 הקובץ ירד. כעת לחץ על '📤 העלה קובץ מקומי' ובחר אותו";
+        div.appendChild(note);
+
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '*/*';
+        const uploadBtn = document.createElement('button');
+        uploadBtn.innerText = '📤 העלה קובץ מקומי';
+        uploadBtn.className = 'btn';
+        uploadBtn.onclick = () => input.click();
+
+        input.onchange = e => {
+          const f = e.target.files[0];
+          if (f) {
+            const url = URL.createObjectURL(f);
+            files[index] = { name: f.name, url, uploaded: true };
+            save();
+          }
+        };
+
+        div.appendChild(uploadBtn);
+        div.appendChild(input);
+      } else {
+        const openBtn = document.createElement('button');
+        openBtn.innerText = '📂 פתח קובץ';
+        openBtn.className = 'btn';
+        openBtn.onclick = () => window.open(file.url, '_blank');
+        div.appendChild(openBtn);
+      }
+
+      box.appendChild(div);
+    });
+
+    // כפתור העלאה רגילה בכל לשונית
+    const upload = document.createElement('div');
+    upload.className = 'upload-box';
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '*/*';
+    input.onchange = e => {
+      const file = e.target.files[0];
+      if (file) {
+        const url = URL.createObjectURL(file);
+        const name = prompt('שם הקובץ שיוצג:') || file.name;
+        files.push({ name, url, uploaded: true });
+        save();
+      }
+    };
+    const label = document.createElement('label');
+    label.innerText = '⬆️ העלה קובץ';
+    label.appendChild(input);
+    upload.appendChild(label);
+    box.appendChild(upload);
+
+    contentsEl.appendChild(box);
+  });
+}
+
+function addByCode() {
+  const code = prompt('🔐 קוד (drive_tab|שם לשונית|שם1:ID1,שם2:ID2)');
+  if (!code || !code.startsWith("drive_tab|")) return alert("קוד לא תקין");
+
+  const [_, tabName, list] = code.split("|");
+  if (!tabName || !list) return alert("קוד חסר פרטים");
+
+  const files = list.split(",").map(entry => {
+    const [name, id] = entry.split(":");
+    return {
+      name: name.trim(),
+      driveId: id.trim(),
+      uploaded: false,
+      downloadedOnce: false
+    };
+  });
+
+  if (!tabs.includes(tabName)) {
+    tabs.unshift(tabName);
+    data[tabName] = files;
+    tabSource[tabName] = 'drive';
+    save();
+    setActiveTab(0);
+  } else {
+    alert("הלשונית כבר קיימת");
+  }
+}
+
+renderTabs();
+</script>
+</body>
+</html>
